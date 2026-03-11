@@ -15,7 +15,8 @@ import {
   Activity, 
   UserPlus, 
   Clock,
-  ExternalLink 
+  ExternalLink,
+  Ghost
 } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
