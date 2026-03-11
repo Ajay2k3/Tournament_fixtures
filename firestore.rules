@@ -1,0 +1,57 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if the user is an admin
+    function isAdmin() {
+      return request.auth != null && (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'tier1' || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'tier2');
+    }
+
+    // Helper function to check if the user is a super admin (tier1)
+    function isTier1() {
+      return request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'tier1';
+    }
+
+    // Users Collection
+    match /users/{userId} {
+      allow read: if request.auth != null; // Users can see profiles
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow update: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      allow delete: if isTier1();
+    }
+
+    // Admins Collection
+    match /admins/{adminId} {
+      allow read: if isAdmin();
+      allow write: if isTier1();
+    }
+
+    // Tournaments Collection
+    match /tournaments/{tournamentId} {
+      allow read: if true; // Publicly visible
+      allow create, update: if isAdmin();
+      allow delete: if isTier1();
+    }
+
+    // Participants Collection
+    match /participants/{participantId} {
+      // Private data (phone, age) should only be seen by admins or the participant themselves
+      allow read: if isAdmin() || (request.auth != null && request.auth.uid == resource.data.userId);
+      allow create: if request.auth != null;
+      allow update: if isAdmin() || (request.auth != null && request.auth.uid == resource.data.userId);
+      allow delete: if isAdmin();
+    }
+
+    // Matches Collection
+    match /matches/{matchId} {
+      allow read: if true; // Results are public
+      allow write: if isAdmin();
+    }
+
+    // Leaderboard Collection
+    match /leaderboard/{entryId} {
+      allow read: if true; // Leaderboard is public
+      allow write: if isAdmin();
+    }
+  }
+}
