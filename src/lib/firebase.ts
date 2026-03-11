@@ -1,6 +1,6 @@
-import { initializeApp, getApps, getApp } from "firebase/app";
-import { getFirestore, onSnapshotsInSync } from "firebase/firestore";
-import { getAuth } from "firebase/auth";
+import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
+import { getFirestore, Firestore, onSnapshotsInSync } from "firebase/firestore";
+import { getAuth, Auth } from "firebase/auth";
 import { getAnalytics, isSupported } from "firebase/analytics";
 
 const firebaseConfig = {
@@ -14,12 +14,22 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-const db = getFirestore(app);
-const auth = getAuth(app);
+let app: FirebaseApp | undefined;
+let db: Firestore | undefined;
+let auth: Auth | undefined;
+
+if (firebaseConfig.apiKey) {
+  try {
+    app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+    db = getFirestore(app);
+    auth = getAuth(app);
+  } catch (error) {
+    console.error("Firebase initialization failed:", error);
+  }
+}
 
 // Monitor connection status
-if (typeof window !== "undefined") {
+if (typeof window !== "undefined" && db) {
   console.log("🔥 Firebase initialized with Project ID:", firebaseConfig.projectId);
   onSnapshotsInSync(db, () => {
     console.log("✅ Firestore connected and synced!");
@@ -27,6 +37,8 @@ if (typeof window !== "undefined") {
 }
 
 // Initialize Analytics
-const analytics = typeof window !== "undefined" ? isSupported().then(yes => yes ? getAnalytics(app) : null) : null;
+const analytics = (typeof window !== "undefined" && app) 
+  ? isSupported().then(yes => (yes && app) ? getAnalytics(app) : null) 
+  : null;
 
 export { app, db, auth, analytics };
