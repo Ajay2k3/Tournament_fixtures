@@ -159,6 +159,52 @@ export const getDashboardSummary = async (adminId: string) => {
   };
 };
 
+export const updateMatchResult = async (
+  matchId: string, 
+  results: { 
+    score1: number; 
+    score2: number; 
+    winnerId: string | null;
+    status: 'completed' | 'in_progress'
+  }
+) => {
+  const matchRef = doc(db, 'matches', matchId);
+  const matchSnap = await getDoc(matchRef);
+  if (!matchSnap.exists()) throw new Error("Match not found");
+  
+  const match = matchSnap.data() as Match;
+  
+  // Update the current match
+  await updateDoc(matchRef, {
+    score1: results.score1,
+    score2: results.score2,
+    winnerId: results.winnerId,
+    status: results.status,
+    updatedAt: Date.now()
+  });
+
+  // If match is completed and has a winner and a nextMatchId, advance the winner
+  if (results.status === 'completed' && results.winnerId && match.nextMatchId) {
+    const nextMatchRef = doc(db, 'matches', match.nextMatchId);
+    const nextMatchSnap = await getDoc(nextMatchRef);
+    
+    if (nextMatchSnap.exists()) {
+      const nextMatch = nextMatchSnap.data() as Match;
+      
+      // Determine which participant slot to fill in the next match
+      // We use matchNumber/round logic or simply fill the first null slot
+      // In our generateKnockoutFixtures, we link two matches to one nextMatchId
+      // So we check which slot is available or based on match index
+      
+      if (!nextMatch.participant1Id) {
+        await updateDoc(nextMatchRef, { participant1Id: results.winnerId });
+      } else if (!nextMatch.participant2Id && nextMatch.participant1Id !== results.winnerId) {
+        await updateDoc(nextMatchRef, { participant2Id: results.winnerId });
+      }
+    }
+  }
+};
+
 export const getGlobalStats = async () => {
   const [tSnap, pSnap] = await Promise.all([
     getDocs(collection(db, 'tournaments')),
